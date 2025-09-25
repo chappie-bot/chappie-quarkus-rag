@@ -1,4 +1,4 @@
-name: Check Quarkus release & ingest
+name: Manual release & ingest
 
 on:
   schedule:
