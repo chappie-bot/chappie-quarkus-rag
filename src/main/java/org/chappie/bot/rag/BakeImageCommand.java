@@ -35,6 +35,7 @@ import com.google.cloud.tools.jib.api.buildplan.AbsoluteUnixPath;
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer;
 import com.google.cloud.tools.jib.api.buildplan.Platform;
 import dev.langchain4j.data.document.Document;
+import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.document.splitter.DocumentSplitters;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -69,6 +70,9 @@ public class BakeImageCommand implements Runnable {
 
     @Option(names = "--chunk-overlap", defaultValue = "200", description = "Splitter chunk overlap (default: ${DEFAULT-VALUE}).")
     int chunkOverlap;
+
+    @Option(names = "--semantic", description = "Use semantic chunking (split by AsciiDoc headers) instead of fixed-size chunks.")
+    boolean semanticChunking;
 
     // --- Image output ---
     @Option(names = "--push", description = "Push to remote registry instead of loading to local Docker daemon.")
@@ -131,7 +135,14 @@ public class BakeImageCommand implements Runnable {
 
             EmbeddingModel embeddingModel = new BgeSmallEnV15QuantizedEmbeddingModel();
 
-            var splitter = DocumentSplitters.recursive(chunkSize, chunkOverlap);
+            DocumentSplitter splitter;
+            if (semanticChunking) {
+                LOG.infof("[ingest] Using semantic chunking (AsciiDoc headers), max chunk=%d", chunkSize);
+                splitter = new AsciiDocSemanticSplitter(chunkSize, chunkOverlap);
+            } else {
+                LOG.infof("[ingest] Using recursive chunking, size=%d, overlap=%d", chunkSize, chunkOverlap);
+                splitter = DocumentSplitters.recursive(chunkSize, chunkOverlap);
+            }
 
             EmbeddingStoreIngestor ingestor = EmbeddingStoreIngestor.builder()
                     .embeddingModel(embeddingModel)
